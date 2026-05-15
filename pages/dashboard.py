@@ -11,6 +11,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import sqlite3
 from datetime import datetime, timezone
+st.write("yfinance version:", yf.__version__)
+st.write("pandas version:", pd.__version__)
 # --- PAGE CONFIG ---
 st.set_page_config(
     page_title="AI Stock Prediction Dashboard",
