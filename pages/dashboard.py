@@ -344,11 +344,7 @@ if logout:
 # Stock Selection
 stock = st.sidebar.text_input("Enter Stock Symbol", "AAPL").strip().upper()
 st.sidebar.markdown("Examples: AAPL, TSLA, RELIANCE.NS, BTC-USD")
-compare_tickers = st.sidebar.multiselect(
-    "Compare tickers (Online mode)",
-    ["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "NVDA"],
-    default=[]
-)
+
 
 # Date Selection
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
@@ -507,27 +503,7 @@ try:
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # ✅ Compare Stocks goes AFTER the chart if/else
-    st.subheader("📊 Compare Stocks (Normalized)")
-
-    if len(compare_tickers) < 2:
-        st.info("Select at least 2 tickers in the sidebar to compare.")
-    elif data_mode != "Online (Twelve Data)":
-        st.info("Comparison is available in Online (Twelve Data) mode.")
-    else:
-        fig_cmp = go.Figure()
-        for t in compare_tickers:
-            dfi = load_data_twelvedata(t, start_date, end_date)
-            if dfi.empty or "Close" not in dfi.columns:
-                continue
-            s = dfi["Close"].dropna()
-            if s.empty:
-                continue
-            norm = (s / s.iloc[0]) * 100
-            fig_cmp.add_trace(go.Scatter(x=norm.index, y=norm.values, name=t))
-
-        fig_cmp.update_layout(template="plotly_dark", height=450, yaxis_title="Normalized (100 = start)")
-        st.plotly_chart(fig_cmp, use_container_width=True)
+   
         if "RSI 14" in indicators:
             st.subheader("📉 RSI (14)")
             rsi_fig = go.Figure()
