@@ -319,7 +319,9 @@ indicators = st.sidebar.multiselect(
 # --- MAIN APP LOGIC ---
 try:
     with st.spinner("Loading Stock Data..."):
-        data, source, debug_text = load_data(stock, start_date, end_date)
+        data = load_data(stock, start_date, end_date)
+    source = "load_data"
+    debug_text = ""
 
     if debug_mode:
         st.caption(f"Source: {source}")
