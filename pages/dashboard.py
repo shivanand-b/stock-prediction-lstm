@@ -51,30 +51,30 @@ def load_data(stock, start_date, end_date):
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
+    debug = []
     if end_date <= start_date:
-        return pd.DataFrame()
+        return pd.DataFrame(), "invalid_dates", "end_date must be > start_date"
 
-    # ---------- 1) Stooq first (usually fastest + reliable on Streamlit Cloud) ----------
+    # 1) Stooq (US symbols)
     try:
         sym = stock.lower()
-        if sym.isalpha():           # AAPL -> aapl.us
+        if sym.isalpha():
             sym = f"{sym}.us"
-
         url = f"https://stooq.com/q/d/l/?s={sym}&i=d"
-        r = requests.get(url, timeout=12)
-        r.raise_for_status()
+        df = pd.read_csv(url)
+        debug.append(f"stooq url={url} rows={len(df)}")
 
-        df = pd.read_csv(StringIO(r.text))
         if not df.empty and "Date" in df.columns:
             df["Date"] = pd.to_datetime(df["Date"])
             df = df.set_index("Date").sort_index()
             df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
+            debug.append(f"stooq after filter shape={df.shape}")
             if not df.empty:
-                return df
-    except Exception:
-        pass
+                return df, "stooq", "\n".join(debug)
+    except Exception as e:
+        debug.append(f"stooq error: {e}")
 
-    # ---------- 2) Yahoo (yfinance) fallback ----------
+    # 2) Yahoo (yfinance)
     try:
         df = yf.download(
             stock,
@@ -82,13 +82,15 @@ def load_data(stock, start_date, end_date):
             end=end_date,
             auto_adjust=True,
             progress=False,
-            threads=False,
+            threads=False
         )
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        return df
-    except Exception:
-        return pd.DataFrame()
+        debug.append(f"yfinance.download shape={df.shape}")
+        return df, "yfinance.download", "\n".join(debug)
+    except Exception as e:
+        debug.append(f"yfinance.download error: {e}")
+        return pd.DataFrame(), "yfinance.error", "\n".join(debug)
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
@@ -265,6 +267,7 @@ st.markdown("LSTM Deep Learning Based Stock Analysis System")
 
 # --- SIDEBAR ---
 st.sidebar.title("Settings")
+debug_mode = st.sidebar.checkbox("Debug mode")
 # --- Admin: Clear Streamlit cache ---
 if st.sidebar.button("🧹 Clear Cache (Admin)"):
     st.cache_data.clear()
@@ -311,11 +314,16 @@ indicators = st.sidebar.multiselect(
 # --- MAIN APP LOGIC ---
 try:
     with st.spinner("Loading Stock Data..."):
-        data = load_data(stock, start_date, end_date)
+        data, source, debug_text = load_data(stock, start_date, end_date)
+
+if debug_mode:
+    st.caption(f"Source: {source}")
 
     if data.empty:
-        st.error("No data found for this symbol. Please check the ticker.")
-        st.stop()
+    st.error(f"No data returned for '{stock}' ({source}). Try AAPL and a shorter range like 2023–2025.")
+    if debug_mode:
+        st.code(debug_text)
+    st.stop()
     # --- Indicators (for charts only) ---
     df = data.copy()
 
