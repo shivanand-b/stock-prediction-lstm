@@ -357,8 +357,6 @@ try:
 
     # --- Indicators (for charts only) ---
     df = data.copy()
-    # --- Indicators (for charts only) ---
-    df = data.copy()
 
     df["EMA20"] = df["Close"].ewm(span=20, adjust=False).mean()
     df["EMA50"] = df["Close"].ewm(span=50, adjust=False).mean()
@@ -373,13 +371,13 @@ try:
     gain = delta.clip(lower=0).rolling(14).mean()
     loss = (-delta.clip(upper=0)).rolling(14).mean()
     rs = gain / (loss + 1e-9)
-    df["RSI14"] = 100 - (100 / (1 + rs))    
-
+    df["RSI14"] = 100 - (100 / (1 + rs))
     # Company Information Section
     try:
-    ticker_info = yf.Ticker(stock).info
+        ticker_info = yf.Ticker(stock).info
     except Exception:
-    ticker_info = {}
+        ticker_info = {}
+
     st.subheader("🏢 Company Information")
     col1, col2 = st.columns(2)
     with col1:
@@ -391,10 +389,10 @@ try:
 
     # Metrics Section
     st.subheader(f"📊 {stock} Latest Data")
-    latest_price = float(data['Close'].iloc[-1])
-    open_price = float(data['Open'].iloc[-1])
-    high_price = float(data['High'].iloc[-1])
-    low_price = float(data['Low'].iloc[-1])
+    latest_price = float(data["Close"].iloc[-1])
+    open_price = float(data["Open"].iloc[-1])
+    high_price = float(data["High"].iloc[-1])
+    low_price = float(data["Low"].iloc[-1])
 
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("Current Price", f"${latest_price:.2f}")
