@@ -56,25 +56,58 @@ def load_data(stock, start_date, end_date):
     if end_date <= start_date:
         return pd.DataFrame()
 
+    # Attempt 1: yfinance.download
     for _ in range(3):
-        data = yf.download(
-            stock,
-            start=start_date,
-            end=end_date,
-            auto_adjust=True,
-            progress=False,
-            threads=False
-        )
-        # Fix for MultiIndex columns in newer yfinance versions
-        if isinstance(data.columns, pd.MultiIndex):
-            data.columns = data.columns.get_level_values(0)
-
-        if not data.empty:
-            return data
-
+        try:
+            df = yf.download(
+                stock,
+                start=start_date,
+                end=end_date,
+                auto_adjust=True,
+                progress=False,
+                threads=False,
+            )
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            if not df.empty:
+                return df
+        except Exception:
+            pass
         time.sleep(1)
 
-    return pd.DataFrame()
+    # Attempt 2: yfinance.history (sometimes works when download fails)
+    for _ in range(2):
+        try:
+            df = yf.Ticker(stock).history(
+                start=start_date,
+                end=end_date,
+                auto_adjust=True
+            )
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+            if not df.empty:
+                return df
+        except Exception:
+            pass
+        time.sleep(1)
+
+    # Attempt 3: Stooq fallback (reliable on Streamlit Cloud for many US tickers)
+    try:
+        sym = stock.lower()
+        if sym.isalpha():  # e.g., AAPL -> aapl.us for Stooq
+            sym = f"{sym}.us"
+
+        url = f"https://stooq.com/q/d/l/?s={sym}&i=d"
+        df = pd.read_csv(url)
+        if df.empty or "Date" not in df.columns:
+            return pd.DataFrame()
+
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.set_index("Date").sort_index()
+        df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
+        return df
+    except Exception:
+        return pd.DataFrame()
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
