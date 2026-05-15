@@ -316,14 +316,14 @@ try:
     with st.spinner("Loading Stock Data..."):
         data, source, debug_text = load_data(stock, start_date, end_date)
 
-if debug_mode:
-    st.caption(f"Source: {source}")
+    if debug_mode:
+        st.caption(f"Source: {source}")
 
     if data.empty:
-    st.error(f"No data returned for '{stock}' ({source}). Try AAPL and a shorter range like 2023–2025.")
-    if debug_mode:
-        st.code(debug_text)
-    st.stop()
+        st.error(f"No data returned for '{stock}' ({source}). Try AAPL and date range 2023–2025.")
+        if debug_mode:
+            st.code(debug_text)
+        st.stop()
     # --- Indicators (for charts only) ---
     df = data.copy()
 
