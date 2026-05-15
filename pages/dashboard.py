@@ -306,6 +306,12 @@ st.sidebar.markdown("Examples: AAPL, TSLA, RELIANCE.NS, BTC-USD")
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
 end_date = st.sidebar.date_input("End Date", pd.to_datetime("2025-01-01"))
 st.sidebar.markdown("---")
+data_mode = st.sidebar.radio("Data Source", ["Online (Yahoo)", "Upload CSV"], index=0)
+
+uploaded_file = None
+if data_mode == "Upload CSV":
+    uploaded_file = st.sidebar.file_uploader("Upload OHLCV CSV", type=["csv"])
+st.sidebar.markdown("---")
 st.sidebar.subheader("📌 Chart Settings")
 
 chart_type = st.sidebar.selectbox("Chart Type", ["Line (Close)", "Candlestick + Volume"])
@@ -319,18 +325,33 @@ indicators = st.sidebar.multiselect(
 # --- MAIN APP LOGIC ---
 try:
     with st.spinner("Loading Stock Data..."):
+    if data_mode == "Upload CSV":
+        if uploaded_file is None:
+            st.info("Upload a CSV file to continue. Columns required: Date, Open, High, Low, Close (Volume optional).")
+            st.stop()
+
+        data = pd.read_csv(uploaded_file)
+
+        if "Date" in data.columns:
+            data["Date"] = pd.to_datetime(data["Date"])
+            data = data.set_index("Date")
+
+        required = {"Open", "High", "Low", "Close"}
+        if not required.issubset(set(data.columns)):
+            st.error(f"CSV must contain columns: {sorted(required)}. Found: {list(data.columns)}")
+            st.stop()
+
+        data = data.sort_index()
+
+    else:
         data = load_data(stock, start_date, end_date)
-    source = "load_data"
-    debug_text = ""
 
-    if debug_mode:
-        st.caption(f"Source: {source}")
-
-    if data.empty:
-        st.error(f"No data returned for '{stock}' ({source}). Try AAPL and date range 2023–2025.")
-        if debug_mode:
-            st.code(debug_text)
-        st.stop()
+        if data.empty:
+            st.error(
+                "Online data is not available on Streamlit Cloud (Yahoo may block cloud servers). "
+                "Switch Data Source to 'Upload CSV'."
+            )
+            st.stop()
     # --- Indicators (for charts only) ---
     df = data.copy()
 
