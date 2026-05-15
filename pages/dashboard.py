@@ -322,36 +322,41 @@ indicators = st.sidebar.multiselect(
     default=["EMA 20", "EMA 50"]
 )
 
+
 # --- MAIN APP LOGIC ---
 try:
     with st.spinner("Loading Stock Data..."):
-    if data_mode == "Upload CSV":
-        if uploaded_file is None:
-            st.info("Upload a CSV file to continue. Columns required: Date, Open, High, Low, Close (Volume optional).")
-            st.stop()
+        if data_mode == "Upload CSV":
+            if uploaded_file is None:
+                st.info("Upload a CSV file to continue. Columns required: Date, Open, High, Low, Close (Volume optional).")
+                st.stop()
 
-        data = pd.read_csv(uploaded_file)
+            data = pd.read_csv(uploaded_file)
 
-        if "Date" in data.columns:
-            data["Date"] = pd.to_datetime(data["Date"])
-            data = data.set_index("Date")
+            if "Date" in data.columns:
+                data["Date"] = pd.to_datetime(data["Date"])
+                data = data.set_index("Date")
 
-        required = {"Open", "High", "Low", "Close"}
-        if not required.issubset(set(data.columns)):
-            st.error(f"CSV must contain columns: {sorted(required)}. Found: {list(data.columns)}")
-            st.stop()
+            required = {"Open", "High", "Low", "Close"}
+            if not required.issubset(set(data.columns)):
+                st.error(f"CSV must contain columns: {sorted(required)}. Found: {list(data.columns)}")
+                st.stop()
 
-        data = data.sort_index()
+            data = data.sort_index()
 
-    else:
-        data = load_data(stock, start_date, end_date)
+        else:
+            data = load_data(stock, start_date, end_date)
 
-        if data.empty:
-            st.error(
-                "Online data is not available on Streamlit Cloud (Yahoo may block cloud servers). "
-                "Switch Data Source to 'Upload CSV'."
-            )
-            st.stop()
+    # after spinner ends, validate data once
+    if data is None or data.empty:
+        st.error(
+            "Online data is not available on Streamlit Cloud (Yahoo may block cloud servers). "
+            "Switch Data Source to 'Upload CSV'."
+        )
+        st.stop()
+
+    # --- Indicators (for charts only) ---
+    df = data.copy()
     # --- Indicators (for charts only) ---
     df = data.copy()
 
@@ -371,7 +376,10 @@ try:
     df["RSI14"] = 100 - (100 / (1 + rs))    
 
     # Company Information Section
+    try:
     ticker_info = yf.Ticker(stock).info
+    except Exception:
+    ticker_info = {}
     st.subheader("🏢 Company Information")
     col1, col2 = st.columns(2)
     with col1:
@@ -459,7 +467,7 @@ try:
             rsi_fig.update_layout(template="plotly_dark", height=300, hovermode="x unified")
             st.plotly_chart(rsi_fig, use_container_width=True)
 
-        # --- 🤖 DATA PREPARATION & ML (LEAKAGE-FREE) ---
+    # --- 🤖 DATA PREPARATION & ML (LEAKAGE-FREE) ---
     close_values = data[["Close"]].values  # numpy array
 
     training_data_len = int(len(close_values) * 0.8)
