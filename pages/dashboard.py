@@ -561,7 +561,7 @@ try:
     fig3.update_layout(template="plotly_dark", height=500)
     st.plotly_chart(fig3, use_container_width=True)
 
-        # Next Day Prediction
+    # Next Day Prediction
     last_60_days = scaled_data[-60:].reshape(1, 60, 1)
     next_day_prediction = model.predict(last_60_days)
     next_day_prediction = scaler.inverse_transform(next_day_prediction)
@@ -569,7 +569,6 @@ try:
     st.subheader("🔮 Next Day Prediction")
     st.success(f"Predicted Next Close Price: **${next_day_prediction[0][0]:.2f}**")
 
-    # --- 🧾 FORWARD TEST (LIVE ACCURACY) ---
     st.subheader("🧾 Forward Test (Live Accuracy Log)")
 
     if data_mode == "Upload CSV":
@@ -589,8 +588,8 @@ try:
                     username=username,
                     ticker=stock,
                     predicted_for=pred_for,
-                    predicted_close=next_day_prediction[0][0],
-                    last_close=latest_price
+                    predicted_close=float(next_day_prediction[0][0]),
+                    last_close=float(latest_price),
                 )
                 st.success("Saved. Come back later and click Refresh to evaluate.")
 
@@ -600,44 +599,39 @@ try:
                 st.success("Refreshed.")
 
         logs = load_logs(conn, username=username, ticker=stock)
+
         pending = int(logs["actual_close"].isna().sum()) if not logs.empty else 0
-        evaluated = int(len(logs) - pending)
+        evaluated = int(len(logs) - pending) if not logs.empty else 0
         st.caption(f"Forward Test Status → Evaluated: {evaluated} | Pending: {pending}")
-        ...
 
-    if logs.empty:
-        st.info("No forward-test logs yet. Save a prediction first.")
-    else:
-        eval_df = logs.dropna(subset=["actual_close"]).copy()
-
-        if not eval_df.empty:
-            eval_df["abs_error"] = (eval_df["actual_close"] - eval_df["predicted_close"]).abs()
-            eval_df["pct_error"] = (eval_df["abs_error"] / eval_df["actual_close"]) * 100
-
-            rmse_live = np.sqrt(mean_squared_error(eval_df["actual_close"], eval_df["predicted_close"]))
-            mae_live = eval_df["abs_error"].mean()
-            mape_live = eval_df["pct_error"].mean()
-
-            m1, m2, m3 = st.columns(3)
-            m1.metric("Live RMSE", f"{rmse_live:.2f}")
-            m2.metric("Live MAE", f"{mae_live:.2f}")
-            m3.metric("Live MAPE", f"{mape_live:.2f}%")
-
-            st.dataframe(
-                eval_df[["predicted_for", "predicted_close", "actual_close", "abs_error", "pct_error"]],
-                use_container_width=True
-            )
-
-            fig_live = go.Figure()
-            fig_live.add_trace(go.Scatter(x=eval_df["predicted_for"], y=eval_df["actual_close"], name="Actual"))
-            fig_live.add_trace(go.Scatter(x=eval_df["predicted_for"], y=eval_df["predicted_close"], name="Predicted"))
-            fig_live.update_layout(template="plotly_dark", height=450, title="Forward Test: Actual vs Predicted")
-            st.plotly_chart(fig_live, use_container_width=True)
+        if logs.empty:
+            st.info("No forward-test logs yet. Save a prediction first.")
         else:
-            st.info("Logs exist but none have actual prices yet (wait until market close / Yahoo update).")
+            eval_df = logs.dropna(subset=["actual_close"]).copy()
 
-        st.subheader("All Logs (including pending)")
-        st.dataframe(logs, use_container_width=True)
+            if not eval_df.empty:
+                eval_df["abs_error"] = (eval_df["actual_close"] - eval_df["predicted_close"]).abs()
+                eval_df["pct_error"] = (eval_df["abs_error"] / eval_df["actual_close"]) * 100
+
+                rmse_live = np.sqrt(mean_squared_error(eval_df["actual_close"], eval_df["predicted_close"]))
+                mae_live = eval_df["abs_error"].mean()
+                mape_live = eval_df["pct_error"].mean()
+
+                m1, m2, m3 = st.columns(3)
+                m1.metric("Live RMSE", f"{rmse_live:.2f}")
+                m2.metric("Live MAE", f"{mae_live:.2f}")
+                m3.metric("Live MAPE", f"{mape_live:.2f}%")
+
+                fig_live = go.Figure()
+                fig_live.add_trace(go.Scatter(x=eval_df["predicted_for"], y=eval_df["actual_close"], name="Actual"))
+                fig_live.add_trace(go.Scatter(x=eval_df["predicted_for"], y=eval_df["predicted_close"], name="Predicted"))
+                fig_live.update_layout(template="plotly_dark", height=450, title="Forward Test: Actual vs Predicted")
+                st.plotly_chart(fig_live, use_container_width=True)
+            else:
+                st.info("Logs exist but none have actual prices yet (Pending).")
+
+            st.subheader("All Logs (including pending)")
+            st.dataframe(logs, use_container_width=True)
 
     # Latest 10 Predictions Table (keep this OUTSIDE the logs if/else)
     st.subheader("📋 Latest Predictions Comparison")
