@@ -137,6 +137,15 @@ def load_data_twelvedata(stock, start_date, end_date):
     }, inplace=True)
 
     return df
+def get_company_info_twelvedata(symbol: str) -> dict:
+    api_key = st.secrets.get("TWELVE_DATA_API_KEY", "")
+    if not api_key:
+        return {}
+
+    url = "https://api.twelvedata.com/quote"
+    r = requests.get(url, params={"symbol": symbol, "apikey": api_key}, timeout=20)
+    js = r.json()
+    return js if isinstance(js, dict) else {}
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
@@ -404,20 +413,16 @@ try:
     rs = gain / (loss + 1e-9)
     df["RSI14"] = 100 - (100 / (1 + rs))
     # Company Information Section
-    try:
-        ticker_info = yf.Ticker(stock).info
-    except Exception:
-        ticker_info = {}
+    info = get_company_info_twelvedata(stock)
 
     st.subheader("🏢 Company Information")
     col1, col2 = st.columns(2)
     with col1:
-        st.write("**Company:**", ticker_info.get("longName", "N/A"))
-        st.write("**Sector:**", ticker_info.get("sector", "N/A"))
+        st.write("**Company:**", info.get("name", "N/A"))
+        st.write("**Exchange:**", info.get("exchange", "N/A"))
     with col2:
-        st.write("**Industry:**", ticker_info.get("industry", "N/A"))
-        st.write("**Country:**", ticker_info.get("country", "N/A"))
-
+        st.write("**Currency:**", info.get("currency", "N/A"))
+        st.write("**Country:**", info.get("country", "N/A"))
     # Metrics Section
     st.subheader(f"📊 {stock} Latest Data")
     latest_price = float(data["Close"].iloc[-1])
@@ -431,7 +436,7 @@ try:
     m3.metric("High", f"${high_price:.2f}")
     m4.metric("Low", f"${low_price:.2f}")
 
-    st.dataframe(data.tail())
+    st.dataframe(data.tail(), use_container_width=True)
 
     # Download Data
     csv = data.to_csv().encode('utf-8')
@@ -565,13 +570,14 @@ try:
     st.success(f"Predicted Next Close Price: **${next_day_prediction[0][0]:.2f}**")
 
     # --- 🧾 FORWARD TEST (LIVE ACCURACY) ---
-    conn = pred_db()
     st.subheader("🧾 Forward Test (Live Accuracy Log)")
 
-    pred_for = next_market_day_using_yf(stock, data.index[-1])
-    if pred_for is None:
-        st.warning("Could not determine next market day.")
+    if data_mode == "Upload CSV":
+        st.info("Forward Test needs Online mode (to fetch actual close). Switch Data Source to 'Online'.")
     else:
+        conn = pred_db()
+
+        pred_for = next_market_day_using_yf(stock, data.index[-1])
         st.write("Prediction is for:", pred_for.date())
 
         colA, colB = st.columns(2)
@@ -586,14 +592,18 @@ try:
                     predicted_close=next_day_prediction[0][0],
                     last_close=latest_price
                 )
-                st.success("Saved. Come back after market close to see actual vs predicted.")
+                st.success("Saved. Come back later and click Refresh to evaluate.")
 
         with colB:
             if st.button("🔄 Refresh actual prices (evaluate pending logs)", type="primary"):
                 refresh_actuals(conn, username=username, ticker=stock)
-                st.success("Refreshed. If Yahoo has the close price, it will be updated.")    
+                st.success("Refreshed.")
 
-    logs = load_logs(conn, username=username, ticker=stock)
+        logs = load_logs(conn, username=username, ticker=stock)
+        pending = int(logs["actual_close"].isna().sum()) if not logs.empty else 0
+        evaluated = int(len(logs) - pending)
+        st.caption(f"Forward Test Status → Evaluated: {evaluated} | Pending: {pending}")
+        ...
 
     if logs.empty:
         st.info("No forward-test logs yet. Save a prediction first.")
