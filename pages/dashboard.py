@@ -344,6 +344,11 @@ if logout:
 # Stock Selection
 stock = st.sidebar.text_input("Enter Stock Symbol", "AAPL").strip().upper()
 st.sidebar.markdown("Examples: AAPL, TSLA, RELIANCE.NS, BTC-USD")
+compare_tickers = st.sidebar.multiselect(
+    "Compare tickers (Online mode)",
+    ["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "NVDA"],
+    default=[]
+)
 
 # Date Selection
 start_date = st.sidebar.date_input("Start Date", pd.to_datetime("2020-01-01"))
