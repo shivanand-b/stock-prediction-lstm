@@ -1,3 +1,6 @@
+import socket
+import requests
+from io import StringIO
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -11,11 +14,11 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import sqlite3
 from datetime import datetime, timezone
+socket.setdefaulttimeout(15)  # prevents hanging forever on cloud
 
 
 
 # --- 🔐 LOGIN PROTECTION ---
-# Note: Ensure "login_app.py" exists in your directory for switch_page to work.
 if "logged_in" not in st.session_state or not st.session_state.logged_in:
     st.warning("Please login first 🔐")
     st.stop()
@@ -42,7 +45,6 @@ def train_model(x_train, y_train):
     model.fit(x_train, y_train, epochs=5, batch_size=32, verbose=0)
     return model
 
-# --- ✅ CACHED DATA LOADING ---
 @st.cache_data(ttl=3600)
 def load_data(stock, start_date, end_date):
     stock = str(stock).strip().upper()
@@ -52,55 +54,38 @@ def load_data(stock, start_date, end_date):
     if end_date <= start_date:
         return pd.DataFrame()
 
-    # Attempt 1: yfinance.download
-    for _ in range(3):
-        try:
-            df = yf.download(
-                stock,
-                start=start_date,
-                end=end_date,
-                auto_adjust=True,
-                progress=False,
-                threads=False,
-            )
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            if not df.empty:
-                return df
-        except Exception:
-            pass
-        time.sleep(1)
-
-    # Attempt 2: yfinance.history (sometimes works when download fails)
-    for _ in range(2):
-        try:
-            df = yf.Ticker(stock).history(
-                start=start_date,
-                end=end_date,
-                auto_adjust=True
-            )
-            if isinstance(df.columns, pd.MultiIndex):
-                df.columns = df.columns.get_level_values(0)
-            if not df.empty:
-                return df
-        except Exception:
-            pass
-        time.sleep(1)
-
-    # Attempt 3: Stooq fallback (reliable on Streamlit Cloud for many US tickers)
+    # ---------- 1) Stooq first (usually fastest + reliable on Streamlit Cloud) ----------
     try:
         sym = stock.lower()
-        if sym.isalpha():  # e.g., AAPL -> aapl.us for Stooq
+        if sym.isalpha():           # AAPL -> aapl.us
             sym = f"{sym}.us"
 
         url = f"https://stooq.com/q/d/l/?s={sym}&i=d"
-        df = pd.read_csv(url)
-        if df.empty or "Date" not in df.columns:
-            return pd.DataFrame()
+        r = requests.get(url, timeout=12)
+        r.raise_for_status()
 
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.set_index("Date").sort_index()
-        df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
+        df = pd.read_csv(StringIO(r.text))
+        if not df.empty and "Date" in df.columns:
+            df["Date"] = pd.to_datetime(df["Date"])
+            df = df.set_index("Date").sort_index()
+            df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
+            if not df.empty:
+                return df
+    except Exception:
+        pass
+
+    # ---------- 2) Yahoo (yfinance) fallback ----------
+    try:
+        df = yf.download(
+            stock,
+            start=start_date,
+            end=end_date,
+            auto_adjust=True,
+            progress=False,
+            threads=False,
+        )
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
         return df
     except Exception:
         return pd.DataFrame()
