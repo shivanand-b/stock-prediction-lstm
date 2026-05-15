@@ -86,10 +86,10 @@ if selected == "Login":
         )
 
         if result:
-         st.session_state.logged_in = True
-         st.session_state.username = username
-         st.success(f"Welcome {username} 🔥")
-         st.switch_page("pages/dashboard.py")
+            st.session_state.logged_in = True
+            st.session_state.username = username
+            st.success(f"Welcome {username} 🔥")
+            st.switch_page("pages/dashboard.py")
 
 # SIGNUP PAGE
 if selected == "Signup":
