@@ -204,6 +204,9 @@ def refresh_actuals(conn, username, ticker=None):
 
     for row_id, tkr, pred_for in rows:
         pred_for = pd.to_datetime(pred_for).normalize()
+        if st.button("🧪 Test data for predicted day"):
+            test_df = load_data_twelvedata(stock, pred_for, pred_for + pd.Timedelta(days=7))
+            st.write(test_df.head())
 
         df = load_data_twelvedata(tkr, pred_for, pred_for + pd.Timedelta(days=7))
         if df.empty:
