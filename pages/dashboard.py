@@ -11,11 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import sqlite3
 from datetime import datetime, timezone
-# --- PAGE CONFIG ---
-st.set_page_config(
-    page_title="AI Stock Prediction Dashboard",
-    layout="wide"
-)
+
 
 
 # --- 🔐 LOGIN PROTECTION ---
