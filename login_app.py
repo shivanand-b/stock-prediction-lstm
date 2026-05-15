@@ -8,7 +8,7 @@ if "logged_in" not in st.session_state:
 # PAGE CONFIG
 st.set_page_config(
     page_title="AI Stock Prediction System",
-    layout="centered"
+    layout="wide"
 )
 
 # DATABASE CONNECTION
