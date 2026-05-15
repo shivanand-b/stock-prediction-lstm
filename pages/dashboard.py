@@ -459,21 +459,29 @@ try:
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_upper"], name="BB Upper", line=dict(width=1)))
             fig.add_trace(go.Scatter(x=df.index, y=df["BB_lower"], name="BB Lower", line=dict(width=1)))
 
-        fig.update_layout(template="plotly_dark", height=520, hovermode="x unified",
-                      xaxis_title="Date", yaxis_title="Price")
+        fig.update_layout(
+            template="plotly_dark",
+            height=520,
+            hovermode="x unified",
+            xaxis_title="Date",
+            yaxis_title="Price"
+        )
         st.plotly_chart(fig, use_container_width=True)
 
     else:
-        fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
-                        row_heights=[0.75, 0.25], vertical_spacing=0.05)
+        fig = make_subplots(
+            rows=2, cols=1, shared_xaxes=True,
+            row_heights=[0.75, 0.25], vertical_spacing=0.05
+        )
 
         fig.add_trace(
-        go.Candlestick(
-            x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"],
-            name="Candles"
-        ),
-        row=1, col=1
-    )
+            go.Candlestick(
+                x=df.index, open=df["Open"], high=df["High"],
+                low=df["Low"], close=df["Close"],
+                name="Candles"
+            ),
+            row=1, col=1
+        )
 
         if "EMA 20" in indicators:
             fig.add_trace(go.Scatter(x=df.index, y=df["EMA20"], name="EMA 20", line=dict(width=1.5)), row=1, col=1)
@@ -490,11 +498,31 @@ try:
             template="plotly_dark",
             height=650,
             hovermode="x unified",
-            xaxis_rangeslider_visible=False,
-            margin=dict(l=10, r=10, t=40, b=10)
-    )
+            xaxis_rangeslider_visible=False
+        )
         st.plotly_chart(fig, use_container_width=True)
 
+    # ✅ Compare Stocks goes AFTER the chart if/else
+    st.subheader("📊 Compare Stocks (Normalized)")
+
+    if len(compare_tickers) < 2:
+        st.info("Select at least 2 tickers in the sidebar to compare.")
+    elif data_mode != "Online (Twelve Data)":
+        st.info("Comparison is available in Online (Twelve Data) mode.")
+    else:
+        fig_cmp = go.Figure()
+        for t in compare_tickers:
+            dfi = load_data_twelvedata(t, start_date, end_date)
+            if dfi.empty or "Close" not in dfi.columns:
+                continue
+            s = dfi["Close"].dropna()
+            if s.empty:
+                continue
+            norm = (s / s.iloc[0]) * 100
+            fig_cmp.add_trace(go.Scatter(x=norm.index, y=norm.values, name=t))
+
+        fig_cmp.update_layout(template="plotly_dark", height=450, yaxis_title="Normalized (100 = start)")
+        st.plotly_chart(fig_cmp, use_container_width=True)
         if "RSI 14" in indicators:
             st.subheader("📉 RSI (14)")
             rsi_fig = go.Figure()
