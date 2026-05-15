@@ -45,36 +45,43 @@ def train_model(x_train, y_train):
     model.fit(x_train, y_train, epochs=5, batch_size=32, verbose=0)
     return model
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)  # shorter TTL so empty results don't stick for long
 def load_data(stock, start_date, end_date):
     stock = str(stock).strip().upper()
     start_date = pd.to_datetime(start_date)
     end_date = pd.to_datetime(end_date)
 
-    debug = []
     if end_date <= start_date:
-        return pd.DataFrame(), "invalid_dates", "end_date must be > start_date"
+        return pd.DataFrame()
 
-    # 1) Stooq (US symbols)
-    try:
-        sym = stock.lower()
-        if sym.isalpha():
-            sym = f"{sym}.us"
-        url = f"https://stooq.com/q/d/l/?s={sym}&i=d"
-        df = pd.read_csv(url)
-        debug.append(f"stooq url={url} rows={len(df)}")
+    # --------- Stooq first (try .com and .pl) ----------
+    def stooq_symbol(sym: str) -> str:
+        s = sym.lower()
+        # Stooq format for US stocks: aapl.us
+        if s.isalpha():
+            return f"{s}.us"
+        return s
 
-        if not df.empty and "Date" in df.columns:
-            df["Date"] = pd.to_datetime(df["Date"])
-            df = df.set_index("Date").sort_index()
-            df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
-            debug.append(f"stooq after filter shape={df.shape}")
-            if not df.empty:
-                return df, "stooq", "\n".join(debug)
-    except Exception as e:
-        debug.append(f"stooq error: {e}")
+    sym = stooq_symbol(stock)
+    headers = {"User-Agent": "Mozilla/5.0"}
 
-    # 2) Yahoo (yfinance)
+    for base in ["https://stooq.com", "https://stooq.pl"]:
+        try:
+            url = f"{base}/q/d/l/?s={sym}&i=d"
+            r = requests.get(url, headers=headers, timeout=20)
+            r.raise_for_status()
+
+            df = pd.read_csv(StringIO(r.text))
+            if not df.empty and "Date" in df.columns:
+                df["Date"] = pd.to_datetime(df["Date"])
+                df = df.set_index("Date").sort_index()
+                df = df.loc[(df.index >= start_date) & (df.index <= end_date)]
+                if not df.empty:
+                    return df
+        except Exception:
+            pass
+
+    # --------- Yahoo fallback ----------
     try:
         df = yf.download(
             stock,
@@ -82,15 +89,13 @@ def load_data(stock, start_date, end_date):
             end=end_date,
             auto_adjust=True,
             progress=False,
-            threads=False
+            threads=False,
         )
         if isinstance(df.columns, pd.MultiIndex):
             df.columns = df.columns.get_level_values(0)
-        debug.append(f"yfinance.download shape={df.shape}")
-        return df, "yfinance.download", "\n".join(debug)
-    except Exception as e:
-        debug.append(f"yfinance.download error: {e}")
-        return pd.DataFrame(), "yfinance.error", "\n".join(debug)
+        return df
+    except Exception:
+        return pd.DataFrame()
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
