@@ -2,6 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
+import time
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_squared_error
 from tensorflow.keras.models import Sequential
@@ -46,13 +47,34 @@ def train_model(x_train, y_train):
     return model
 
 # --- ✅ CACHED DATA LOADING ---
-@st.cache_data
+@st.cache_data(ttl=3600)
 def load_data(stock, start_date, end_date):
-    data = yf.download(stock, start=start_date, end=end_date, auto_adjust=True)
-    # Fix for MultiIndex columns in newer yfinance versions
-    if isinstance(data.columns, pd.MultiIndex):
-        data.columns = data.columns.get_level_values(0)
-    return data
+    stock = str(stock).strip().upper()
+    start_date = pd.to_datetime(start_date)
+    end_date = pd.to_datetime(end_date)
+
+    if end_date <= start_date:
+        return pd.DataFrame()
+
+    for _ in range(3):
+        data = yf.download(
+            stock,
+            start=start_date,
+            end=end_date,
+            auto_adjust=True,
+            progress=False,
+            threads=False
+        )
+        # Fix for MultiIndex columns in newer yfinance versions
+        if isinstance(data.columns, pd.MultiIndex):
+            data.columns = data.columns.get_level_values(0)
+
+        if not data.empty:
+            return data
+
+        time.sleep(1)
+
+    return pd.DataFrame()
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
@@ -250,7 +272,7 @@ if logout:
     st.rerun()
 
 # Stock Selection
-stock = st.sidebar.text_input("Enter Stock Symbol", "AAPL")
+stock = st.sidebar.text_input("Enter Stock Symbol", "AAPL").strip().upper()
 st.sidebar.markdown("Examples: AAPL, TSLA, RELIANCE.NS, BTC-USD")
 
 # Date Selection
