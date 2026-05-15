@@ -6,3 +6,4 @@ numpy==1.26.4
 scikit-learn==1.5.1
 plotly==5.22.0
 tensorflow==2.16.1
+requests==2.32.3
