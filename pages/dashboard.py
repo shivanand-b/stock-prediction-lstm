@@ -158,14 +158,11 @@ def pred_db():
     return conn
 
 def next_market_day_using_yf(ticker: str, last_date):
+    # No network call (works on Streamlit Cloud). Skips weekends only.
     d = pd.to_datetime(last_date).normalize() + pd.Timedelta(days=1)
-    for _ in range(10):  # skip weekends/holidays
-        tmp = yf.download(ticker, start=d, end=d + pd.Timedelta(days=1),
-                          auto_adjust=True, progress=False)
-        if not tmp.empty:
-            return tmp.index[0].normalize()
-        d = d + pd.Timedelta(days=1)
-    return None
+    while d.weekday() >= 5:  # 5=Sat, 6=Sun
+        d += pd.Timedelta(days=1)
+    return d
 
 def log_prediction(conn, username, ticker, predicted_for, predicted_close, last_close):
     conn.execute("""
@@ -199,24 +196,17 @@ def refresh_actuals(conn, username, ticker=None):
     for row_id, tkr, pred_for in rows:
         pred_for = pd.to_datetime(pred_for).normalize()
 
-        df = yf.download(
-            tkr,
-            start=pred_for,
-            end=pred_for + pd.Timedelta(days=1),
-            auto_adjust=True,
-            progress=False
-        )
+        df = load_data_twelvedata(tkr, pred_for, pred_for + pd.Timedelta(days=7))
         if df.empty:
             continue
 
-        # Fix MultiIndex columns
-        if isinstance(df.columns, pd.MultiIndex):
-            df.columns = df.columns.get_level_values(0)
+        df.index = pd.to_datetime(df.index).normalize()
+        if pred_for not in df.index:
+            continue
 
-        close_obj = df["Close"]
-        actual_close = float(close_obj.iloc[0, 0]) if isinstance(close_obj, pd.DataFrame) else float(close_obj.iloc[0])
+        val = df.loc[pred_for, "Close"]
+        actual_close = float(val.iloc[0]) if isinstance(val, pd.Series) else float(val)
 
-        # Update inside the loop
         conn.execute("""
             UPDATE forward_predictions
             SET actual_close=?, evaluated_at=?
