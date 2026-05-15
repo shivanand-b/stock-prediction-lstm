@@ -2,6 +2,8 @@
 
 A Streamlit-based stock analysis and next-day closing price prediction system using an LSTM deep learning model.
 
+Live Demo: https://lstm-stock-prediction-app.streamlit.app/dashboard
+
 ## Features
 - Login/Signup using SQLite (`users.db`)
 - Stock data download using Yahoo Finance (`yfinance`)
