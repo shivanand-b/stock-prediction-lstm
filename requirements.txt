@@ -1,8 +1,8 @@
-streamlit
-streamlit-option-menu
-yfinance
-pandas
-numpy
-scikit-learn
-plotly
-tensorflow
+streamlit==1.36.0
+streamlit-option-menu==0.3.13
+yfinance==0.2.40
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.5.1
+plotly==5.22.0
+tensorflow==2.16.1
