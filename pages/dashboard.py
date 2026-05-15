@@ -96,6 +96,47 @@ def load_data(stock, start_date, end_date):
         return df
     except Exception:
         return pd.DataFrame()
+        
+def load_data_twelvedata(stock, start_date, end_date):
+    api_key = st.secrets.get("TWELVE_DATA_API_KEY", "")
+    if not api_key:
+        return pd.DataFrame()
+
+    stock = str(stock).strip().upper()
+    start_date = pd.to_datetime(start_date).date()
+    end_date = pd.to_datetime(end_date).date()
+
+    url = "https://api.twelvedata.com/time_series"
+    params = {
+        "symbol": stock,
+        "interval": "1day",
+        "start_date": str(start_date),
+        "end_date": str(end_date),
+        "apikey": api_key,
+        "outputsize": 5000,
+        "format": "JSON",
+    }
+
+    r = requests.get(url, params=params, timeout=20)
+    js = r.json()
+
+    if "values" not in js:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(js["values"])
+    df.rename(columns={"datetime": "Date"}, inplace=True)
+    df["Date"] = pd.to_datetime(df["Date"])
+    df = df.set_index("Date").sort_index()
+
+    for c in ["open", "high", "low", "close", "volume"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    df.rename(columns={
+        "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"
+    }, inplace=True)
+
+    return df
 # --- ✅ FORWARD TEST DB (LIVE ACCURACY LOG) ---
 @st.cache_resource
 def pred_db():
@@ -345,7 +386,7 @@ try:
             data = data.sort_index()
 
         else:
-            data = load_data(stock, start_date, end_date)
+            data = load_data_twelvedata(stock, start_date, end_date)
 
     # after spinner ends, validate data once
     if data is None or data.empty:
