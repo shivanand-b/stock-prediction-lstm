@@ -280,6 +280,11 @@ st.markdown("LSTM Deep Learning Based Stock Analysis System")
 
 # --- SIDEBAR ---
 st.sidebar.title("Settings")
+# --- Admin: Clear Streamlit cache ---
+if st.sidebar.button("🧹 Clear Cache (Admin)"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.rerun()
 
 # Profile Section
 st.sidebar.markdown("## 👤 Profile")
